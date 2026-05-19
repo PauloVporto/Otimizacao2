@@ -1,151 +1,219 @@
-# Projeto de Filas em Python (M/G/1 e outros modelos)
 
-Este repositório contém implementações em Python de vários modelos de filas clássicos (M/G/1, M/M/1, M/M/s, M/M/1/K, M/M/s/K, M/M/1/N e M/M/s/N). O código foi escrito para ser simples, didático e reutilizável tanto como biblioteca quanto como script de exemplos.
+# 📊  - Teoria das Filas em Python
 
-## Objetivo
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tkinter](https://img.shields.io/badge/GUI-Tkinter-orange.svg)](https://docs.python.org/3/library/tkinter.html)
 
-- Implementar fórmulas clássicas de teoria de filas para calcular métricas como ρ (taxa de utilização), L (número médio no sistema), Lq (número médio na fila), W (tempo médio no sistema) e Wq (tempo médio na fila).
-- Incluir suporte a prioridades no caso M/G/1 (não preemptivo) e M/M/1 (preemptivo).
-- Resolver exercícios propostos em sala de aula sobre teoria de filas.
-- Manter o projeto leve, sem dependências externas além da biblioteca padrão do Python.
+Sistema completo para análise e simulação de modelos de filas clássicos da Teoria das Filas. Implementa modelos M/M/s, M/G/1, filas com prioridade, capacidade finita e população finita, com interface gráfica moderna e suporte a OCR para resolução de exercícios a partir de imagens/PDFs.
 
-## Estrutura do repositório
+## ✨ Funcionalidades
 
-- `formulas.py` — implementação principal com as classes e métodos para os modelos M/G/1, M/M/1, M/M/s, M/M/1/K, M/M/s/K, M/M/1/N, M/M/s/N e M/M/1 com prioridades preemptivas.
-- `interface.py` — interface CLI simples para executar e testar modelos interativamente (detecta automaticamente o repositório).
-- `ListaExercicios.py` — script que executa os exercícios propostos em sala de aula, validando as implementações contra os casos de teste fornecidos.
-- `README.md` — este arquivo explicativo.
-- `requirements.txt` — mantido para sinalizar dependências (atualmente apenas stdlib).
+### 📈 Modelos Implementados
+- **M/M/1 e M/M/s** - Fila com capacidade infinita
+- **M/G/1** - Distribuição geral de serviço (Pollaczek-Khinchine)
+- **Prioridades** - Com e sem interrupção (preemptivo/não-preemptivo)
+- **Capacidade Finita (K)** - M/M/1/K e M/M/s/K
+- **População Finita (N)** - M/M/1/N e M/M/s/N
 
-> **Observação:** não há dependências externas além da biblioteca padrão do Python.
+### 🎯 Métricas Calculadas
+- `ρ` (Taxa de utilização do sistema)
+- `L` (Número médio de clientes no sistema)
+- `Lq` (Número médio de clientes na fila)
+- `W` (Tempo médio de permanência no sistema)
+- `Wq` (Tempo médio de espera na fila)
+- `P0`, `Pn` (Probabilidades de estados)
+- `P(W > t)`, `P(Wq > t)` (Probabilidades de tempo de espera)
 
-## Como executar (local)
+### 🖥️ Interfaces Disponíveis
 
-1. **(Opcional, recomendado)** Crie um ambiente virtual:
+| Interface | Descrição | Como acessar |
+|-----------|-----------|--------------|
+| **GUI Moderna** | Interface gráfica com Tkinter, abas organizadas, OCR integrado | `python app.py` |
+| **CLI Interativa** | Linha de comando para testes rápidos | `python interface.py` |
+| **Script de Exercícios** | Executa lista de exercícios pré-definidos | `python ListaExercicios.py` |
+| **Biblioteca Python** | Importe as classes em seus próprios projetos | `from forms import *` |
 
-**Unix / macOS (bash/zsh):**
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
+### 🤖 OCR Solver (Novidade!)
+- Reconhecimento de texto em imagens e PDFs
+- Extração automática de parâmetros (λ, μ, s)
+- Resolução automática de exercícios
+- Suporte aos idiomas português e inglês
 
-**Windows PowerShell (v5+):**
-```powershell
-python -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
-```
+## 🚀 Instalação Rápida
 
-2. **Execute os scripts:**
-
-```powershell
-# Para rodar os exemplos embutidos em formulas.py
-python formulas.py
-
-# Para interface interativa (permite testar modelos com parâmetros personalizados)
-python interface.py
-
-# Para executar os exercícios propostos em sala de aula
-python ListaExercicios.py
-
-# Para abrir a interface gráfica (Tkinter)
-python app.py
-```
-
-## Interface gráfica (Tkinter)
-
-A aplicação gráfica em `app.py` fornece abas para calcular rapidamente as métricas:
-
-- M/M/1 e M/M/s (capacidade infinita)
-- M/G/1 simples e com prioridades não preemptivas; e M/M/1 com prioridades preemptivas
-- Filas com capacidade finita: M/M/1/K e M/M/s/K
-- População finita: M/M/1/N e M/M/s/N
-- Aba “Resolver Lista Exercícios” que roda `ListaExercicios.py` e mostra os resultados
-
-Como executar:
-
-```powershell
-python app.py
-```
-
-Se aparecer erro de import, garanta que `formulas.py` e `ListaExercicios.py` estão na mesma pasta do `app.py`.
-O Tkinter já vem com o Python padrão para Windows/macOS; se estiver usando uma distribuição mínima, instale o suporte ao Tk.
-
-## Requisitos
-
+### Requisitos
 - Python 3.8 ou superior
-- Sem dependências externas (usa apenas a biblioteca padrão)
+- Pip (gerenciador de pacotes)
 
-## Visão geral (principais classes em `formulas.py`)
+### Passo a Passo
 
-- **`Mg1(lam, mi, var, lam_list=None, interrupt=False)`**
-  - Modelo M/G/1 (Poisson arrivals, general service time, 1 server).
-  - Parâmetros: `lam` (λ total), `mi` (μ), `var` (variância do tempo de serviço), `lam_list` (taxas por prioridade, opcional).
-  - Métodos: `mg1()`, `mg1_prioridades_nao_preemptivo()`, `mg1_print()`.
+```bash
+# 1. Clone o repositório
+git clone https://github.com/seu-usuario/QueueSim-Pro.git
+cd QueueSim-Pro
 
-- **`Mm(lam, mi, s=1)`**
-  - Modelo M/M/1 (s=1) e M/M/s (s>1).
-  - Métodos: `mm1()`, `mms()`, `resultado()`.
+# 2. (Opcional) Crie um ambiente virtual
+python -m venv .venv
 
-- **`Mm1k(lam, mi, k)`** — M/M/1/K (capacidade finita K).
-- **`Mmsk(lam, mi, s, k)`** — M/M/s/K (s servidores, capacidade K).
-- **`Mm1n(lam_por_cliente, mi, n_pop)`** — M/M/1/N (população finita N).
-- **`Mmsn(lam_por_cliente, mi, s, n_pop)`** — M/M/s/N (s servidores, população N).
-- **`Mm1PrioridadePreemptiva(lam_list, mi)`** — M/M/1 com prioridades preemptivas (COM interrupção).
+# 3. Ative o ambiente virtual
+# Windows:
+.venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
 
-Cada classe contém validações básicas (por exemplo, `mi != 0`) e tratamento de casos especiais (por exemplo, ρ = 1 quando necessário).
+# 4. Instale as dependências
+pip install -r requirements.txt
 
-## Exercícios de sala de aula
+# 5. Execute a aplicação
+python app.py
+Dependências Específicas
+bash
+# Para OCR (reconhecimento de imagem/PDF)
+pip install Pillow pytesseract PyMuPDF
 
-O arquivo `ListaExercicios.py` contém implementações dos exercícios propostos durante as aulas, organizados por tipo de modelo:
+# Instalar Tesseract OCR no sistema:
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt-get install tesseract-ocr tesseract-ocr-por
+# Mac: brew install tesseract tesseract-lang
+📖 Como Usar
+Interface Gráfica (Recomendado)
+bash
+python app.py
+A interface possui as seguintes abas:
 
-- **Lista M/M/1 e M/M/s** — exercícios 5, 7, 15
-- **Lista M/G/1 e Prioridades** — exercícios 1, 6a, 6b, 6c
-- **Lista M/M/1/K e M/M/s/K** — exercícios 1, 4, 5
-- **Lista M/M/1/N e M/M/s/N** — exercícios 3, 4d, 6
+📈 M/M/s - Sistema com capacidade infinita
 
-Para executar todos os testes:
- 
-```powershell
-python ListaExercicios.py
-```
+📐 M/G/1 - Distribuição geral de serviço
 
-## Exemplos de uso rápido
+⚡ Prioridades - Com/sem interrupção
 
-**M/G/1 sem prioridades:**
- 
-```python
-from formulas import Mg1
-modelo = Mg1(lam=2, mi=5, var=0.04)
-modelo.mg1_print()
-```
+🔒 Filas Finitas - Capacidade K ou População N
 
-**M/G/1 com prioridades (não preemptivo):**
- 
-```python
-modelo = Mg1(lam=3, mi=6, var=0.05, lam_list=[1,1,1], interrupt=False)
-modelo.mg1_print()
-```
+🔍 OCR Solver - Resolução por imagem/PDF
 
-**M/M/1 com prioridades (preemptivo):**
- 
-```python
-from formulas import Mm1PrioridadePreemptiva
-modelo = Mm1PrioridadePreemptiva(lam_list=[2, 4, 2], mi=10)
+📝 Lista - Execução de exercícios
+
+Linha de Comando
+python
+from forms import Mm, Mg1, Mm1k
+
+# Exemplo M/M/1
+modelo = Mm(lam=2.0, mi=3.0, s=1)
 modelo.resultado()
-```
 
-## Como contribuir / observações
+# Exemplo M/G/1
+modelo = Mg1(lam=8.0, mi=10.0, var=0.005)
+modelo.mg1_print()
 
-- O código é intencionalmente simples e didático.
-- Se quiser adicionar novos modelos ou melhorias, crie uma branch e envie um Pull Request.
-- Antes de abrir uma PR, garanta que o código segue a mesma formatação e que os exemplos continuam funcionando.
+# Exemplo M/M/1/K (capacidade finita)
+modelo = Mm1k(lam=1.0, mi=2.0, k=10)
+modelo.resultado()
+OCR Solver - Resolvendo Exercícios
+Tire uma foto do exercício ou escaneie para PDF
 
-## Licença
+Na aba "🔍 OCR Solver", clique em "Carregar Imagem/PDF"
 
-Consulte o arquivo `LICENSE` neste repositório.
+Aguarde o processamento e extração do texto
 
-## Contato
+O sistema identificará automaticamente λ, μ e outros parâmetros
 
-Se houver dúvidas sobre o conteúdo ou problemas reproduzindo os exemplos, abra uma issue descrevendo o ambiente (OS, versão do Python) e o erro observado.
+Resultados serão exibidos automaticamente
 
+📁 Estrutura do Projeto
+text
+QueueSim-Pro/
+│
+├── app.py                      # Interface gráfica principal (Tkinter)
+├── interface.py                # Interface CLI interativa
+├── ListaExercicios.py          # Script com exercícios resolvidos
+├── requirements.txt            # Dependências do projeto
+├── README.md                   # Documentação
+│
+├── forms/                      # Módulos dos modelos de fila
+│   ├── __init__.py
+│   ├── mg1.py                  # Modelo M/G/1
+│   ├── mm.py                   # Modelo M/M/s
+│   ├── mm1k.py                 # M/M/1/K (capacidade finita)
+│   ├── mmsk.py                 # M/M/s/K (capacidade finita)
+│   ├── mm1n.py                 # M/M/1/N (população finita)
+│   ├── mmsn.py                 # M/M/s/N (população finita)
+│   ├── prioridadesInterrupcao.py      # Prioridade com interrupção
+│   └── prioridadesSemInterrup.py      # Prioridade sem interrupção
+│
+└── .venv/                      # Ambiente virtual (opcional)
+💡 Exemplos Práticos
+Exemplo 1: M/M/1 - Loja com um atendente
+python
+from forms import Mm
 
+# λ = 30 clientes/hora, μ = 40 clientes/hora
+modelo = Mm(lam=30, mi=40, s=1)
+modelo.resultado()
+
+# Resultados:
+# ρ = 0.75 (75% de ocupação)
+# L = 3.0 clientes no sistema
+# W = 0.1 horas = 6 minutos no sistema
+Exemplo 2: M/M/s - Call center com 3 atendentes
+python
+from forms import Mm
+
+# λ = 60 chamadas/hora, μ = 25 chamadas/hora, s = 3
+modelo = Mm(lam=60, mi=25, s=3)
+modelo.resultado()
+Exemplo 3: M/G/1 - Distribuição geral
+python
+from forms import Mg1
+
+# λ = 8, μ = 10, variância = 0.005
+modelo = Mg1(lam=8, mi=10, var=0.005)
+modelo.mg1_print()
+🧪 Executando Testes
+bash
+# Executar todos os exercícios da lista
+python ListaExercicios.py
+
+# Testar modelo específico via CLI
+python interface.py
+📊 Exemplos de Saída
+text
+═══════════════════════════════════════════════════════════
+📊 RESULTADOS M/M/1
+═══════════════════════════════════════════════════════════
+
+📌 PARÂMETROS:
+   λ = 2.000 clientes/hora
+   μ = 3.000 clientes/hora
+   s = 1 servidor
+
+📈 MÉTRICAS DO SISTEMA:
+   • ρ (Utilização): 0.6667 (66.67%)
+   • L (clientes no sistema): 2.0000
+   • Lq (clientes na fila): 1.3333
+   • W (tempo no sistema): 1.0000 horas (60.00 min)
+   • Wq (tempo na fila): 0.6667 horas (40.00 min)
+   • P0 (sistema vazio): 0.3333 (33.33%)
+
+📊 PROBABILIDADES Pn:
+   • P0: 0.333333 (33.3333%)
+   • P1: 0.222222 (22.2222%)
+   • P2: 0.148148 (14.8148%)
+🔧 Configuração Avançada
+Variáveis de Ambiente
+bash
+# Para usar OCR com idioma específico
+export TESSERACT_LANG="por"  # Português
+Personalização da Interface
+A interface gráfica suporta temas modernos (clam, alt, default, classic). Altere no arquivo app.py:
+
+python
+style.theme_use('clam')  # Opções: 'clam', 'alt', 'default', 'classic'
+🐛 Solução de Problemas
+Problema	Solução
+ModuleNotFoundError: No module named 'forms'	Verifique se está executando na raiz do projeto
+OCR não funciona	Instale o Tesseract no sistema (veja instruções acima)
+Interface gráfica não abre	Instale o suporte Tkinter: sudo apt-get install python3-tk
+Erro de importação	Execute pip install -r requirements.txt
+📝 Licença
+Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para detalhes.
