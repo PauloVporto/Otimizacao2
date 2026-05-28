@@ -126,8 +126,8 @@ class OutputArea:
         text_frame = ttk.Frame(self.frame)
         text_frame.pack(fill='both', expand=True)
         
-        self.text_area = tk.Text(text_frame, height=15, wrap='word', 
-                                 font=('Consolas', 10), 
+        self.text_area = tk.Text(text_frame, height=28, wrap='word',
+                                 font=('Consolas', 10),
                                  bg=ModernStyle.COLORS['background'],
                                  fg=ModernStyle.COLORS['text'],
                                  relief='flat', borderwidth=0,
@@ -405,8 +405,8 @@ class FilaApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Calculadora - Teoria das Filas")
-        self.root.geometry("1100x750")
-        self.root.minsize(1000, 650)
+        self.root.geometry("1280x900")
+        self.root.minsize(1100, 800)
         self.root.configure(bg=ModernStyle.COLORS['background'])
         
         # Inicializar solver
@@ -646,43 +646,40 @@ class FilaApp:
         input_card.pack(fill='x', padx=20, pady=15)
         
         # Taxas de chegada
-        ttk.Label(input_card, text="Taxas de Chegada (λi):", font=('Segoe UI', 10)).pack(anchor='w')
-        self.pri_lambdas = tk.Text(input_card, height=3, width=50, font=('Segoe UI', 10),
-                                   bg=ModernStyle.COLORS['background'],
-                                   relief='solid', borderwidth=1)
-        self.pri_lambdas.insert('1.0', "1.5, 2.0, 0.5")
-        self.pri_lambdas.pack(fill='x', pady=(5, 10))
-        
-        ttk.Label(input_card, text="Exemplo: 1.5, 2.0, 0.5 (separados por vírgula)",
-                 font=('Segoe UI', 8), foreground=ModernStyle.COLORS['text_light']).pack(anchor='w')
-        
+        ttk.Label(input_card, text="Taxas de Chegada (λi):  (separados por vírgula, ex: 1.5, 2.0, 0.5)",
+                 font=('Segoe UI', 10)).pack(anchor='w')
+        self.pri_lambdas = tk.Entry(input_card, font=('Segoe UI', 10))
+        self.pri_lambdas.insert(0, "1.5, 2.0, 0.5")
+        self.pri_lambdas.pack(fill='x', pady=(3, 8), ipady=4)
+
         # Outros campos
         fields_frame = ttk.Frame(input_card)
-        fields_frame.pack(fill='x', pady=10)
-        
+        fields_frame.pack(fill='x', pady=5)
+
         self.pri_mi = ModernEntry(fields_frame, "Taxa de Atendimento (μ)", "4.0", "clientes/h")
         self.pri_mi.pack(side='left', expand=True, fill='x', padx=5)
-        
+
         self.pri_s = ModernEntry(fields_frame, "Servidores (s)", "2", "")
         self.pri_s.pack(side='left', expand=True, fill='x', padx=5)
-        
-        # Tipo de prioridade
-        type_frame = ttk.LabelFrame(input_card, text="Tipo de Prioridade", padding=10)
-        type_frame.pack(fill='x', pady=10)
-        
+
+        # Tipo de prioridade (lado a lado, sem labelframe extra)
+        type_frame = ttk.Frame(input_card)
+        type_frame.pack(fill='x', pady=(8, 0))
+
+        ttk.Label(type_frame, text="Tipo:", font=('Segoe UI', 10, 'bold')).pack(side='left', padx=(0, 10))
         self.pri_type = tk.StringVar(value="nonpreemptive")
-        ttk.Radiobutton(type_frame, text="Sem Interrupção (Non-preemptive)", 
-                       variable=self.pri_type, value="nonpreemptive").pack(anchor='w', pady=2)
-        ttk.Radiobutton(type_frame, text="Com Interrupção (Preemptive)", 
-                       variable=self.pri_type, value="preemptive").pack(anchor='w', pady=2)
-        
+        ttk.Radiobutton(type_frame, text="Sem Interrupção",
+                       variable=self.pri_type, value="nonpreemptive").pack(side='left', padx=8)
+        ttk.Radiobutton(type_frame, text="Com Interrupção",
+                       variable=self.pri_type, value="preemptive").pack(side='left', padx=8)
+
         btn_frame = ttk.Frame(input_card)
-        btn_frame.pack(pady=15)
+        btn_frame.pack(pady=8)
         
         self.pri_output = OutputArea(main_frame, "RESULTADOS PRIORIDADES")
         
         def calcular():
-            lambdas_text = self.pri_lambdas.get('1.0', 'end-1c')
+            lambdas_text = self.pri_lambdas.get()
             lambdas = []
             for x in lambdas_text.split(','):
                 try:
@@ -976,8 +973,8 @@ if __name__ == "__main__":
     
     # Centralizar janela
     root.update_idletasks()
-    width = 1100
-    height = 750
+    width = 1280
+    height = 900
     x = (root.winfo_screenwidth() // 2) - (width // 2)
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f'{width}x{height}+{x}+{y}')
