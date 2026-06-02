@@ -1,29 +1,42 @@
-"""Aplicação de Teoria das Filas com Interface Gráfica Moderna."""
+"""Calculadora - Teoria das Filas | Interface PySide6 Moderna."""
 import sys
 import io
 import os
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from typing import Optional
 import re
+from typing import Optional
 
-# Tentar importar bibliotecas para OCR e processamento de imagem
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QLineEdit, QTextEdit, QTabWidget,
+    QFrame, QGridLayout, QButtonGroup, QRadioButton, QFileDialog,
+    QScrollArea, QSizePolicy, QSpacerItem, QMessageBox, QGroupBox,
+    QSplitter
+)
+from PySide6.QtCore import Qt, QThread, Signal, QPropertyAnimation, QEasingCurve, QSize, QTimer
+from PySide6.QtGui import (
+    QFont, QColor, QPalette, QLinearGradient, QPainter, QPixmap,
+    QIcon, QTextCursor, QFontDatabase, QGradient
+)
+
+# ─── Tentativa de imports dos modelos ────────────────────────────────────────
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
+
+try:
     import pytesseract
     TESSERACT_AVAILABLE = True
 except ImportError:
     TESSERACT_AVAILABLE = False
-    print("Aviso: Bibliotecas de OCR não instaladas. Instale com: pip install Pillow pytesseract")
 
 try:
-    import fitz  # PyMuPDF
+    import fitz
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
-    print("Aviso: PyMuPDF não instalado. Instale com: pip install PyMuPDF")
 
-# Importar os modelos de fila
 try:
     from forms.mg1 import Mg1
     from forms.mm import Mm
@@ -37,947 +50,1191 @@ try:
     MODELS_AVAILABLE = True
 except ImportError as e:
     MODELS_AVAILABLE = False
-    print(f"Erro ao importar modelos: {e}")
+    print(f"[aviso] modelos não encontrados: {e}")
+
+# ─── Paleta de cores ──────────────────────────────────────────────────────────
+C = {
+    "bg":        "#0D1117",
+    "surface":   "#161B22",
+    "surface2":  "#1C2333",
+    "border":    "#30363D",
+    "border2":   "#484F58",
+    "accent":    "#58A6FF",
+    "accent2":   "#1F6FEB",
+    "green":     "#3FB950",
+    "green_dk":  "#238636",
+    "yellow":    "#D29922",
+    "red":       "#F85149",
+    "text":      "#E6EDF3",
+    "text2":     "#8B949E",
+    "text3":     "#484F58",
+    "header_bg": "#010409",
+}
+
+# ─── Stylesheet global ───────────────────────────────────────────────────────
+STYLE = f"""
+QMainWindow, QWidget {{
+    background-color: {C['bg']};
+    color: {C['text']};
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}}
+
+QTabWidget::pane {{
+    background: {C['surface']};
+    border: 1px solid {C['border']};
+    border-radius: 8px;
+    top: -1px;
+}}
+
+QTabBar {{
+    background: transparent;
+}}
+
+QTabBar::tab {{
+    background: {C['surface2']};
+    color: {C['text2']};
+    border: 1px solid {C['border']};
+    border-bottom: none;
+    padding: 10px 22px;
+    margin-right: 2px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}}
+
+QTabBar::tab:selected {{
+    background: {C['surface']};
+    color: {C['accent']};
+    border-color: {C['accent']};
+    border-bottom: 2px solid {C['accent']};
+}}
+
+QTabBar::tab:hover:!selected {{
+    background: {C['surface']};
+    color: {C['text']};
+}}
+
+QLineEdit {{
+    background: {C['bg']};
+    color: {C['text']};
+    border: 1px solid {C['border']};
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    selection-background-color: {C['accent2']};
+}}
+
+QLineEdit:focus {{
+    border: 1px solid {C['accent']};
+    background: #0D1421;
+}}
+
+QLineEdit:hover {{
+    border: 1px solid {C['border2']};
+}}
+
+QTextEdit {{
+    background: {C['bg']};
+    color: {C['text']};
+    border: 1px solid {C['border']};
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    selection-background-color: {C['accent2']};
+}}
+
+QTextEdit:focus {{
+    border: 1px solid {C['border2']};
+}}
+
+QPushButton {{
+    background: {C['surface2']};
+    color: {C['text']};
+    border: 1px solid {C['border']};
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 600;
+}}
+
+QPushButton:hover {{
+    background: {C['surface']};
+    border-color: {C['border2']};
+    color: {C['accent']};
+}}
+
+QPushButton:pressed {{
+    background: {C['bg']};
+}}
+
+QPushButton#primary {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1F6FEB, stop:1 #1158C7);
+    color: white;
+    border: 1px solid {C['accent2']};
+}}
+
+QPushButton#primary:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #388BFD, stop:1 #1F6FEB);
+    color: white;
+}}
+
+QPushButton#success {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2EA043, stop:1 #1A7431);
+    color: white;
+    border: 1px solid {C['green_dk']};
+    padding: 12px 36px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}}
+
+QPushButton#success:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3FB950, stop:1 #2EA043);
+    color: white;
+}}
+
+QPushButton#danger {{
+    background: {C['surface2']};
+    color: {C['red']};
+    border: 1px solid {C['red']};
+}}
+
+QPushButton#danger:hover {{
+    background: rgba(248, 81, 73, 0.15);
+}}
+
+QRadioButton {{
+    color: {C['text2']};
+    font-size: 12px;
+    spacing: 8px;
+}}
+
+QRadioButton::indicator {{
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 2px solid {C['border2']};
+    background: {C['bg']};
+}}
+
+QRadioButton::indicator:checked {{
+    background: {C['accent']};
+    border-color: {C['accent']};
+}}
+
+QRadioButton:hover {{
+    color: {C['text']};
+}}
+
+QScrollBar:vertical {{
+    background: {C['bg']};
+    width: 8px;
+    border-radius: 4px;
+}}
+
+QScrollBar::handle:vertical {{
+    background: {C['border2']};
+    border-radius: 4px;
+    min-height: 30px;
+}}
+
+QScrollBar::handle:vertical:hover {{
+    background: {C['text2']};
+}}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+}}
+
+QLabel#section_title {{
+    color: {C['text2']};
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding-bottom: 4px;
+}}
+
+QLabel#field_label {{
+    color: {C['text2']};
+    font-size: 11px;
+    font-weight: 500;
+    padding-bottom: 2px;
+}}
+
+QLabel#unit_label {{
+    color: {C['text3']};
+    font-size: 11px;
+    padding-left: 6px;
+    padding-right: 10px;
+}}
+
+QGroupBox {{
+    color: {C['text2']};
+    border: 1px solid {C['border']};
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+}}
+
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: {C['text2']};
+    background: {C['surface']};
+}}
+
+QSplitter::handle:horizontal {{
+    width: 4px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {C['border']}, stop:0.5 {C['accent2']}, stop:1 {C['border']});
+    border-radius: 2px;
+    margin: 8px 0px;
+}}
+
+QSplitter::handle:horizontal:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {C['border2']}, stop:0.5 {C['accent']}, stop:1 {C['border2']});
+}}
+"""
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def divider():
+    """Linha divisória horizontal."""
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setStyleSheet(f"color: {C['border']}; border: none; border-top: 1px solid {C['border']};")
+    return line
 
 
-class ModernStyle:
-    """Configurações de estilo moderno."""
-    
-    COLORS = {
-        'primary': '#1a1a2e',
-        'secondary': '#16213e',
-        'accent': '#0f3460',
-        'success': '#00b894',
-        'warning': '#f39c12',
-        'danger': '#e74c3c',
-        'background': '#f5f6fa',
-        'surface': '#ffffff',
-        'text': '#2d3436',
-        'text_light': '#636e72',
-        'border': '#dfe6e9',
-    }
-    
-    @staticmethod
-    def apply_theme():
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configurar notebook
-        style.configure('TNotebook', background=ModernStyle.COLORS['background'])
-        style.configure('TNotebook.Tab', padding=[20, 10],
-                       font=('Segoe UI', 10, 'bold'))
-        style.map('TNotebook.Tab',
-                  background=[('selected', ModernStyle.COLORS['primary'])],
-                  foreground=[('selected', 'white'), ('active', ModernStyle.COLORS['accent'])])
-        
-        # Configurar botões
-        style.configure('Primary.TButton', font=('Segoe UI', 10, 'bold'),
-                       padding=[25, 12], background=ModernStyle.COLORS['primary'])
-        style.map('Primary.TButton',
-                  background=[('active', ModernStyle.COLORS['accent'])])
-        
-        style.configure('Success.TButton', font=('Segoe UI', 11, 'bold'),
-                       padding=[30, 12], background=ModernStyle.COLORS['success'])
-        style.map('Success.TButton',
-                  background=[('active', '#00a884')])
-        
-        # Configurar frames
-        style.configure('Card.TLabelframe', background=ModernStyle.COLORS['surface'],
-                       relief='solid', borderwidth=1, bordercolor=ModernStyle.COLORS['border'])
-        style.configure('Card.TLabelframe.Label', foreground=ModernStyle.COLORS['primary'],
-                       font=('Segoe UI', 11, 'bold'), background=ModernStyle.COLORS['surface'])
+def make_label(text: str, kind: str = "field_label", font_size: int = 0) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName(kind)
+    if font_size:
+        f = lbl.font()
+        f.setPointSize(font_size)
+        lbl.setFont(f)
+    return lbl
 
 
-class TextRedirector:
-    """Redireciona stdout para um widget Text."""
-    def __init__(self, text_widget):
-        self.text_widget = text_widget
-    
-    def write(self, text):
-        self.text_widget.configure(state='normal')
-        self.text_widget.insert('end', text)
-        self.text_widget.see('end')
-        self.text_widget.configure(state='disabled')
-    
-    def flush(self):
-        pass
+# ─── Campo de entrada ─────────────────────────────────────────────────────────
 
+class FieldEntry(QWidget):
+    def __init__(self, label: str, default: str = "", unit: str = "", parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
 
-class OutputArea:
-    """Área de saída com scroll e botão limpar."""
-    def __init__(self, parent, title="RESULTADOS"):
-        self.parent = parent
-        self.frame = ttk.LabelFrame(parent, text=f"📊 {title}", padding=10, style='Card.TLabelframe')
-        self.frame.pack(fill='both', expand=True, padx=20, pady=10)
-        
-        # Botões
-        btn_frame = ttk.Frame(self.frame)
-        btn_frame.pack(fill='x', pady=(0, 10))
-        
-        self.clear_btn = ttk.Button(btn_frame, text="🗑️ Limpar", command=self.clear,
-                                    style='Primary.TButton')
-        self.clear_btn.pack(side='right')
-        
-        self.copy_btn = ttk.Button(btn_frame, text="📋 Copiar", command=self.copy,
-                                   style='Primary.TButton')
-        self.copy_btn.pack(side='right', padx=5)
-        
-        # Área de texto com scroll
-        text_frame = ttk.Frame(self.frame)
-        text_frame.pack(fill='both', expand=True)
-        
-        self.text_area = tk.Text(text_frame, height=28, wrap='word',
-                                 font=('Consolas', 10),
-                                 bg=ModernStyle.COLORS['background'],
-                                 fg=ModernStyle.COLORS['text'],
-                                 relief='flat', borderwidth=0,
-                                 selectbackground=ModernStyle.COLORS['accent'])
-        
-        scrollbar = ttk.Scrollbar(text_frame, orient='vertical', 
-                                  command=self.text_area.yview)
-        self.text_area.configure(yscrollcommand=scrollbar.set)
-        
-        scrollbar.pack(side='right', fill='y')
-        self.text_area.pack(side='left', fill='both', expand=True)
-    
-    def clear(self):
-        self.text_area.configure(state='normal')
-        self.text_area.delete(1.0, tk.END)
-        self.text_area.configure(state='disabled')
-    
-    def copy(self):
-        text = self.text_area.get(1.0, tk.END).strip()
-        if text:
-            self.parent.clipboard_clear()
-            self.parent.clipboard_append(text)
-            messagebox.showinfo("Copiado", "Resultados copiados para área de transferência!")
-    
-    def write(self, text):
-        self.text_area.configure(state='normal')
-        self.text_area.insert(tk.END, text)
-        self.text_area.see(tk.END)
-        self.text_area.configure(state='disabled')
+        lbl = make_label(label)
+        layout.addWidget(lbl)
 
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
 
-class ModernEntry(ttk.Frame):
-    """Campo de entrada estilizado."""
-    def __init__(self, parent, label_text, default="", unit="", tooltip="", **kwargs):
-        super().__init__(parent, **kwargs)
-        
-        self.label = ttk.Label(self, text=label_text, font=('Segoe UI', 10),
-                               foreground=ModernStyle.COLORS['text'])
-        self.label.pack(anchor='w')
-        
-        entry_frame = ttk.Frame(self)
-        entry_frame.pack(fill='x', pady=(5, 0))
-        
-        self.entry = ttk.Entry(entry_frame, font=('Segoe UI', 10))
-        self.entry.insert(0, default)
-        self.entry.pack(side='left', fill='x', expand=True, ipady=5)
-        
+        self.entry = QLineEdit(default)
+        row.addWidget(self.entry)
+
         if unit:
-            unit_label = ttk.Label(entry_frame, text=unit, font=('Segoe UI', 9), 
-                                  foreground=ModernStyle.COLORS['text_light'])
-            unit_label.pack(side='left', padx=(8, 0))
-        
-        # Tooltip
-        if tooltip:
-            self._create_tooltip(tooltip)
-    
-    def _create_tooltip(self, text):
-        def show_tooltip(event):
-            tooltip = tk.Toplevel(self)
-            tooltip.wm_overrideredirect(True)
-            x = event.widget.winfo_rootx() + 20
-            y = event.widget.winfo_rooty() + 20
-            tooltip.wm_geometry(f"+{x}+{y}")
-            
-            label = tk.Label(tooltip, text=text, background='#ffffe0',
-                           relief='solid', borderwidth=1, padx=5, pady=2,
-                           font=('Segoe UI', 9))
-            label.pack()
-            self.after(3000, lambda: tooltip.destroy())
-        
-        self.label.bind("<Enter>", show_tooltip)
-    
-    def get(self):
-        return self.entry.get()
-    
-    def get_float(self):
+            u = make_label(unit, "unit_label")
+            row.addWidget(u)
+
+        layout.addLayout(row)
+
+    def get(self) -> str:
+        return self.entry.text().strip()
+
+    def get_float(self) -> Optional[float]:
         try:
-            return float(self.get().replace(',', '.'))
+            return float(self.get().replace(",", "."))
         except ValueError:
             return None
-    
-    def get_int(self):
+
+    def get_int(self) -> Optional[int]:
         try:
             return int(self.get())
         except ValueError:
             return None
 
 
-class ExerciseSolver:
-    """Resolver exercícios a partir de imagem/PDF usando OCR."""
-    
-    def __init__(self):
-        self.extracted_text = ""
-    
-    def extract_text_from_image(self, image_path):
-        if not TESSERACT_AVAILABLE:
-            return "❌ Bibliotecas de OCR não instaladas.\n\nPara instalar:\n1. pip install pytesseract pillow\n2. Instale o Tesseract OCR: https://github.com/UB-Mannheim/tesseract/wiki"
-        
-        try:
-            # Abrir e pré-processar imagem
-            image = Image.open(image_path)
-            # Converter para escala de cinza para melhor OCR
-            image = image.convert('L')
-            
-            # Configurar Tesseract para português e inglês
-            text = pytesseract.image_to_string(image, lang='por+eng')
-            
-            if not text.strip():
-                return "❌ Nenhum texto identificado na imagem.\n\nVerifique se a imagem está clara e legível."
-            
-            return text
-        except Exception as e:
-            return f"❌ Erro ao processar imagem: {str(e)}"
-    
-    def extract_text_from_pdf(self, pdf_path):
-        if not PDF_AVAILABLE:
-            return "❌ Biblioteca PyMuPDF não instalada.\n\nInstale com: pip install PyMuPDF"
-        
-        try:
-            doc = fitz.open(pdf_path)
-            text = ""
-            for page_num, page in enumerate(doc, 1):
-                page_text = page.get_text()
-                if page_text.strip():
-                    text += f"--- Página {page_num} ---\n{page_text}\n"
-            
-            return text if text.strip() else "❌ Nenhum texto encontrado no PDF."
-        except Exception as e:
-            return f"❌ Erro ao ler PDF: {str(e)}"
-    
-    def parse_exercise(self, text):
-        """Extrai parâmetros do texto usando regex."""
-        params = {
-            'lam': None,
-            'mi': None,
-            's': 1,
-            'k': None,
-            'n': None,
-            't': None,
-            'var': None
-        }
-        
-        text_lower = text.lower()
-        
-        # Padrões para extração
-        patterns = {
-            'lam': [
-                r'λ\s*=\s*([\d,\.]+)',
-                r'lambda\s*=\s*([\d,\.]+)',
-                r'taxa de chegada\s*[:=]\s*([\d,\.]+)',
-                r'chegada\s*[:=]\s*([\d,\.]+)',
-                r'λ\s*([\d,\.]+)',
-            ],
-            'mi': [
-                r'μ\s*=\s*([\d,\.]+)',
-                r'mi\s*=\s*([\d,\.]+)',
-                r'taxa de atendimento\s*[:=]\s*([\d,\.]+)',
-                r'servi[cç]o\s*[:=]\s*([\d,\.]+)',
-                r'μ\s*([\d,\.]+)',
-            ],
-            's': [
-                r'servidores?\s*[:=]\s*(\d+)',
-                r's\s*=\s*(\d+)',
-                r'canais?\s*[:=]\s*(\d+)',
-            ],
-            'k': [
-                r'capacidade\s*[:=]\s*(\d+)',
-                r'k\s*=\s*(\d+)',
-                r'tamanho máximo\s*[:=]\s*(\d+)',
-            ],
-            'n': [
-                r'popula[cç][aã]o\s*[:=]\s*(\d+)',
-                r'n\s*=\s*(\d+)',
-            ]
-        }
-        
-        for key, pattern_list in patterns.items():
-            for pattern in pattern_list:
-                match = re.search(pattern, text_lower)
-                if match:
-                    value = match.group(1).replace(',', '.')
-                    if key in ['s', 'k', 'n']:
-                        params[key] = int(float(value))
-                    else:
-                        params[key] = float(value)
-                    break
-        
-        return params
-    
-    def solve(self, params, original_text=""):
-        """Resolve o exercício com os parâmetros extraídos."""
+# ─── Área de saída ────────────────────────────────────────────────────────────
+
+class OutputArea(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        # Barra superior
+        bar = QHBoxLayout()
+        bar.setSpacing(6)
+
+        lbl = make_label("SAÍDA", "section_title")
+        bar.addWidget(lbl)
+        bar.addStretch()
+
+        self.copy_btn = QPushButton("⎘  Copiar")
+        self.copy_btn.setObjectName("primary")
+        self.copy_btn.setFixedHeight(30)
+        self.copy_btn.clicked.connect(self._copy)
+        bar.addWidget(self.copy_btn)
+
+        self.clear_btn = QPushButton("✕  Limpar")
+        self.clear_btn.setObjectName("danger")
+        self.clear_btn.setFixedHeight(30)
+        self.clear_btn.clicked.connect(self.clear)
+        bar.addWidget(self.clear_btn)
+
+        layout.addLayout(bar)
+
+        self.text = QTextEdit()
+        self.text.setReadOnly(True)
+        self.text.setFont(QFont("JetBrains Mono, Cascadia Code, Fira Code, Consolas", 12))
+        self.text.setMinimumHeight(500)
+        layout.addWidget(self.text, 1)
+
+    def write(self, content: str):
+        self.text.moveCursor(QTextCursor.End)
+        self.text.insertPlainText(content)
+        self.text.moveCursor(QTextCursor.End)
+
+    def clear(self):
+        self.text.clear()
+
+    def _copy(self):
+        txt = self.text.toPlainText().strip()
+        if txt:
+            QApplication.clipboard().setText(txt)
+            self.copy_btn.setText("✓  Copiado!")
+            QTimer.singleShot(2000, lambda: self.copy_btn.setText("⎘  Copiar"))
+
+
+# ─── Cabeçalho ────────────────────────────────────────────────────────────────
+
+class Header(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(88)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(32, 0, 32, 0)
+        layout.setSpacing(0)
+
+        # ── Lado esquerdo: ícone + textos ────────────────────────────
+        left = QHBoxLayout()
+        left.setSpacing(16)
+
+        # Ícone circular
+        icon_lbl = QLabel("∑")
+        icon_lbl.setFixedSize(44, 44)
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        icon_lbl.setStyleSheet(
+            "background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            "stop:0 #1F6FEB, stop:1 #58A6FF);"
+            "border-radius: 22px;"
+            "color: white;"
+            "font-size: 20px;"
+            "font-weight: 900;"
+        )
+        left.addWidget(icon_lbl)
+
+        texts = QVBoxLayout()
+        texts.setSpacing(3)
+
+        title = QLabel("Teoria das Filas")
+        title.setStyleSheet(
+            "color: #E6EDF3; font-size: 20px; font-weight: 800;"
+            "letter-spacing: -0.5px; background: transparent;"
+        )
+        texts.addWidget(title)
+
+        sub = QLabel("Calculadora de Desempenho  ·  Modelos Estocásticos")
+        sub.setStyleSheet(
+            "color: #8B949E; font-size: 11px; letter-spacing: 0.5px; background: transparent;"
+        )
+        texts.addWidget(sub)
+
+        left.addLayout(texts)
+        layout.addLayout(left)
+        layout.addStretch()
+
+        # ── Lado direito: pill badges ─────────────────────────────────
+        right = QHBoxLayout()
+        right.setSpacing(8)
+
+        pill_style = (
+            "border-radius: 10px; padding: 4px 12px;"
+            "font-size: 10px; font-weight: 700; letter-spacing: 0.8px;"
+            "background: transparent;"
+        )
+
+        for label, color in [
+            ("M/M/s",      "#58A6FF"),
+            ("M/G/1",      "#3FB950"),
+            ("PRIORIDADES","#D29922"),
+            ("OCR",        "#BC8CFF"),
+        ]:
+            p = QLabel(label)
+            p.setStyleSheet(
+                f"{pill_style} color: {color};"
+                f"border: 1px solid {color};"
+            )
+            right.addWidget(p)
+
+        right.addSpacing(16)
+
+        badge = QLabel("v2.0")
+        badge.setStyleSheet(
+            "background: #1C2333; color: #8B949E; border: 1px solid #30363D;"
+            "border-radius: 10px; padding: 4px 12px; font-size: 10px; font-weight: 700;"
+        )
+        right.addWidget(badge)
+
+        layout.addLayout(right)
+
+    def paintEvent(self, event):
+        """Fundo com gradiente sutil + linha accent inferior."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Gradiente de fundo
+        grad = QLinearGradient(0, 0, self.width(), 0)
+        grad.setColorAt(0.0,  QColor("#0A0F1A"))
+        grad.setColorAt(0.4,  QColor("#0D1117"))
+        grad.setColorAt(1.0,  QColor("#0A0F1A"))
+        painter.fillRect(self.rect(), grad)
+
+        # Linha inferior de separação (neutra)
+        painter.setPen(QColor("#30363D"))
+        painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
+
+        # Accent line colorida no topo
+        accent_grad = QLinearGradient(0, 0, self.width(), 0)
+        accent_grad.setColorAt(0.0,  QColor("#1F6FEB"))
+        accent_grad.setColorAt(0.5,  QColor("#58A6FF"))
+        accent_grad.setColorAt(1.0,  QColor("#BC8CFF"))
+        painter.setPen(Qt.NoPen)
+        from PySide6.QtGui import QBrush
+        painter.setBrush(QBrush(accent_grad))
+        painter.drawRect(0, 0, self.width(), 3)
+
+
+# ─── Rodapé ───────────────────────────────────────────────────────────────────
+
+class Footer(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(28)
+        self.setStyleSheet(f"background: {C['header_bg']}; border-top: 1px solid {C['border']};")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(28, 0, 28, 0)
+
+        ocr_ok = "✓ OCR" if (PILLOW_AVAILABLE and TESSERACT_AVAILABLE) else "✗ OCR indisponível"
+        pdf_ok = "✓ PDF" if PDF_AVAILABLE else "✗ PDF indisponível"
+        mod_ok = "✓ Modelos carregados" if MODELS_AVAILABLE else "✗ Modelos não encontrados"
+
+        status = QLabel(f"{mod_ok}   {ocr_ok}   {pdf_ok}")
+        status.setStyleSheet(f"color: {C['text3']}; font-size: 10px;")
+        layout.addWidget(status)
+        layout.addStretch()
+
+
+# ─── Abas ─────────────────────────────────────────────────────────────────────
+
+def _capture(fn) -> str:
+    """Captura stdout de uma chamada."""
+    old = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        fn()
+        return sys.stdout.getvalue()
+    finally:
+        sys.stdout = old
+
+
+def _header(title: str) -> str:
+    bar = "═" * 68
+    return f"{bar}\n  {title}\n{bar}\n"
+
+
+# ─── Painel esquerdo (entrada) com scroll ─────────────────────────────────────
+
+def _left_panel(inner_widget: QWidget) -> QWidget:
+    """Envolve o widget de entrada num QScrollArea estilizado."""
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    scroll.setStyleSheet(f"background: {C['surface']}; border: none;")
+
+    wrapper = QWidget()
+    wrapper.setStyleSheet(f"background: {C['surface']};")
+    lay = QVBoxLayout(wrapper)
+    lay.setContentsMargins(24, 24, 24, 24)
+    lay.setSpacing(0)
+    lay.addWidget(inner_widget)
+    lay.addStretch()
+
+    scroll.setWidget(wrapper)
+    return scroll
+
+
+def _right_panel(output: "OutputArea") -> QWidget:
+    """Envolve a área de saída num container estilizado."""
+    wrap = QWidget()
+    wrap.setStyleSheet(f"background: {C['bg']};")
+    lay = QVBoxLayout(wrap)
+    lay.setContentsMargins(16, 24, 24, 24)
+    lay.setSpacing(0)
+    lay.addWidget(output)
+    return wrap
+
+
+def _make_splitter(left: QWidget, right: QWidget) -> QSplitter:
+    sp = QSplitter(Qt.Horizontal)
+    sp.setHandleWidth(5)
+    sp.addWidget(left)
+    sp.addWidget(right)
+    sp.setSizes([1, 1])          # 50 / 50
+    sp.setStretchFactor(0, 1)
+    sp.setStretchFactor(1, 1)
+    sp.setChildrenCollapsible(False)
+    return sp
+
+
+# ── M/M/s ─────────────────────────────────────────────────────────────────────
+
+class MmsTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ── painel esquerdo ──────────────────────────────────────────
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
+
+        grp = QGroupBox("PARÂMETROS  ·  M/M/s")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(16)
+
+        row1 = QHBoxLayout()
+        self.lam = FieldEntry("Taxa de Chegada (λ)", "1.0", "clientes/h")
+        self.mi  = FieldEntry("Taxa de Atendimento (μ)", "2.0", "clientes/h")
+        row1.addWidget(self.lam)
+        row1.addSpacing(16)
+        row1.addWidget(self.mi)
+        grp_lay.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        self.s = FieldEntry("Servidores (s)", "1")
+        self.t = FieldEntry("Tempo t", "60", "min")
+        self.n = FieldEntry("Clientes n  —  P(N=n)", "5")
+        row2.addWidget(self.s)
+        row2.addSpacing(16)
+        row2.addWidget(self.t)
+        row2.addSpacing(16)
+        row2.addWidget(self.n)
+        grp_lay.addLayout(row2)
+
+        btn = QPushButton("▶   CALCULAR")
+        btn.setObjectName("success")
+        btn.clicked.connect(self._calc)
+        grp_lay.addWidget(btn, alignment=Qt.AlignLeft)
+
+        form_lay.addWidget(grp)
+
+        # ── splitter ─────────────────────────────────────────────────
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _calc(self):
+        lam = self.lam.get_float()
+        mi  = self.mi.get_float()
+        s   = self.s.get_int()
+        t   = self.t.get_float()
+        n   = self.n.get_int()
+
+        if not (lam and mi and s):
+            QMessageBox.warning(self, "Campos inválidos", "Preencha λ, μ e s corretamente.")
+            return
         if not MODELS_AVAILABLE:
-            return "❌ Módulos de modelo não disponíveis.\n\nVerifique se os arquivos forms estão na pasta correta."
-        
-        output = []
-        output.append("═" * 70)
-        output.append("🧮 RESOLUÇÃO DO EXERCÍCIO")
-        output.append("═" * 70)
-        
-        if params['lam'] and params['mi']:
-            lam = params['lam']
-            mi = params['mi']
-            s = params['s']
-            
-            output.append(f"\n📌 PARÂMETROS IDENTIFICADOS:")
-            output.append(f"   • λ (taxa de chegada) = {lam} clientes/hora")
-            output.append(f"   • μ (taxa de atendimento) = {mi} clientes/hora")
-            output.append(f"   • s (servidores) = {s}")
-            
-            # Verificar estabilidade
-            rho = lam / (s * mi)
-            output.append(f"\n📈 UTILIZAÇÃO DO SISTEMA:")
-            output.append(f"   • ρ = λ/(s·μ) = {rho:.4f} ({rho*100:.2f}%)")
-            
-            if rho >= 1:
-                output.append(f"\n⚠️  ATENÇÃO: ρ ≥ 1, o sistema é instável!")
-                output.append(f"   A fila tenderá a crescer infinitamente.")
-                return "\n".join(output)
-            
-            if s == 1:
-                # M/M/1
-                output.append(f"\n📊 MÉTRICAS - MODELO M/M/1:")
-                output.append(f"   {'─' * 50}")
-                
-                L = rho / (1 - rho)
-                Lq = rho**2 / (1 - rho)
-                W = 1 / (mi - lam)
-                Wq = lam / (mi * (mi - lam))
-                P0 = 1 - rho
-                
-                output.append(f"   • L (médio no sistema):      {L:.4f} clientes")
-                output.append(f"   • Lq (médio na fila):        {Lq:.4f} clientes")
-                output.append(f"   • W (tempo no sistema):      {W:.4f} h = {W*60:.2f} min")
-                output.append(f"   • Wq (tempo na fila):        {Wq:.4f} h = {Wq*60:.2f} min")
-                output.append(f"   • P0 (sistema vazio):        {P0:.4f} ({P0*100:.2f}%)")
-                
-                output.append(f"\n📊 PROBABILIDADES Pn:")
-                for n in [0, 1, 2, 3, 4, 5]:
-                    Pn = (1 - rho) * (rho ** n)
-                    output.append(f"   • P{n}: {Pn:.6f} ({Pn*100:.4f}%)")
-            
+            self.output.write("✗ Módulos de modelos não disponíveis.\n"); return
+
+        self.output.clear()
+        self.output.write(_header("MODELO  M/M/s"))
+
+        try:
+            modelo = Mm(lam=lam, mi=mi, s=s)
+            result = _capture(modelo.resultado)
+            self.output.write(result + "\n")
+
+            if n:
+                p = modelo.prob_n_clientes(n=n)
+                self.output.write(f"  P({n})        = {p:.8f}   ({p*100:.4f}%)\n")
+            if t:
+                t_h = t / 60
+                pwq = modelo.prob_wq_maior_que_t(t=t_h)
+                self.output.write(f"  P(Wq>{t:.0f}min) = {pwq:.8f}   ({pwq*100:.4f}%)\n")
+                if s == 1:
+                    pw = modelo.prob_w_maior_que_t(t=t_h)
+                    self.output.write(f"  P(W>{t:.0f}min)  = {pw:.8f}   ({pw*100:.4f}%)\n")
+        except Exception as e:
+            self.output.write(f"\n✗ Erro: {e}\n")
+
+
+# ── M/G/1 ─────────────────────────────────────────────────────────────────────
+
+class Mg1Tab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
+
+        grp = QGroupBox("PARÂMETROS  ·  M/G/1")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(16)
+
+        row1 = QHBoxLayout()
+        self.lam = FieldEntry("Taxa de Chegada (λ)", "8.0", "clientes/h")
+        self.mi  = FieldEntry("Taxa de Atendimento (μ)", "10.0", "clientes/h")
+        row1.addWidget(self.lam)
+        row1.addSpacing(16)
+        row1.addWidget(self.mi)
+        grp_lay.addLayout(row1)
+
+        self.var = FieldEntry("Variância do Serviço (σ²)", "0.005")
+        grp_lay.addWidget(self.var)
+
+        btn = QPushButton("▶   CALCULAR")
+        btn.setObjectName("success")
+        btn.clicked.connect(self._calc)
+        grp_lay.addWidget(btn, alignment=Qt.AlignLeft)
+
+        form_lay.addWidget(grp)
+
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _calc(self):
+        lam = self.lam.get_float()
+        mi  = self.mi.get_float()
+        var = self.var.get_float()
+
+        if lam is None or mi is None or var is None:
+            QMessageBox.warning(self, "Campos inválidos", "Preencha todos os campos.")
+            return
+        if not MODELS_AVAILABLE:
+            self.output.write("✗ Módulos não disponíveis.\n"); return
+
+        self.output.clear()
+        self.output.write(_header("MODELO  M/G/1"))
+        try:
+            modelo = Mg1(lam=lam, mi=mi, var=var)
+            result = _capture(modelo.mg1_print)
+            self.output.write(result + "\n")
+        except Exception as e:
+            self.output.write(f"\n✗ Erro: {e}\n")
+
+
+# ── Prioridades ───────────────────────────────────────────────────────────────
+
+class PriorityTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
+
+        grp = QGroupBox("PARÂMETROS  ·  PRIORIDADES")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(14)
+
+        lam_lbl = make_label("Taxas de Chegada (λ₁, λ₂, …  —  separadas por vírgula)")
+        grp_lay.addWidget(lam_lbl)
+        self.lambdas = QLineEdit("1.5, 2.0, 0.5")
+        grp_lay.addWidget(self.lambdas)
+
+        row = QHBoxLayout()
+        self.mi = FieldEntry("Taxa de Atendimento (μ)", "4.0", "clientes/h")
+        self.s  = FieldEntry("Servidores (s)", "2")
+        row.addWidget(self.mi)
+        row.addSpacing(16)
+        row.addWidget(self.s)
+        grp_lay.addLayout(row)
+
+        type_row = QHBoxLayout()
+        type_lbl = make_label("Tipo:", "section_title")
+        type_row.addWidget(type_lbl)
+        type_row.addSpacing(12)
+        self.rg_preempt = QButtonGroup(self)
+        self.rb_no  = QRadioButton("Sem Interrupção")
+        self.rb_yes = QRadioButton("Com Interrupção")
+        self.rb_no.setChecked(True)
+        self.rg_preempt.addButton(self.rb_no, 0)
+        self.rg_preempt.addButton(self.rb_yes, 1)
+        type_row.addWidget(self.rb_no)
+        type_row.addSpacing(12)
+        type_row.addWidget(self.rb_yes)
+        type_row.addStretch()
+        grp_lay.addLayout(type_row)
+
+        btn = QPushButton("▶   CALCULAR")
+        btn.setObjectName("success")
+        btn.clicked.connect(self._calc)
+        grp_lay.addWidget(btn, alignment=Qt.AlignLeft)
+
+        form_lay.addWidget(grp)
+
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _calc(self):
+        lambdas = []
+        for x in self.lambdas.text().split(","):
+            try:
+                lambdas.append(float(x.strip().replace(",", ".")))
+            except ValueError:
+                pass
+
+        mi = self.mi.get_float()
+        s  = self.s.get_int()
+
+        if not lambdas or not mi or not s:
+            QMessageBox.warning(self, "Campos inválidos", "Preencha todos os campos.")
+            return
+        if not MODELS_AVAILABLE:
+            self.output.write("✗ Módulos não disponíveis.\n"); return
+
+        self.output.clear()
+        tipo = "COM INTERRUPÇÃO" if self.rg_preempt.checkedId() == 1 else "SEM INTERRUPÇÃO"
+        self.output.write(_header(f"PRIORIDADES  ·  {tipo}"))
+
+        try:
+            if self.rg_preempt.checkedId() == 0:
+                res = mms_prioridade_sem_interrupcao(lambdas_=lambdas, mi=mi, servidores=s)
             else:
-                # M/M/s
-                try:
-                    modelo = Mm(lam=lam, mi=mi, s=s)
-                    old_stdout = sys.stdout
-                    sys.stdout = io.StringIO()
-                    modelo.resultado()
-                    result = sys.stdout.getvalue()
-                    sys.stdout = old_stdout
-                    output.append(f"\n{result}")
-                except Exception as e:
-                    output.append(f"\n❌ Erro no cálculo: {str(e)}")
+                res = mms_prioridade_com_interrupcao(lambdas_=lambdas, mi=mi, servidores=s)
+
+            for classe, vals in res.items():
+                if classe == "Erro":
+                    self.output.write(f"✗ {vals}\n"); return
+                self.output.write(f"\n  ── {classe} ──\n")
+                for k, v in vals.items():
+                    val_str = f"{v:.8f}" if isinstance(v, float) else str(v)
+                    self.output.write(f"     {k:25s} {val_str}\n")
+        except Exception as e:
+            self.output.write(f"\n✗ Erro: {e}\n")
+
+
+# ── Filas Finitas ─────────────────────────────────────────────────────────────
+
+class FiniteTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
+
+        grp = QGroupBox("PARÂMETROS  ·  FILAS FINITAS")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(14)
+
+        type_row = QHBoxLayout()
+        type_lbl = make_label("Modelo:", "section_title")
+        type_row.addWidget(type_lbl)
+        type_row.addSpacing(12)
+        self.rg_type = QButtonGroup(self)
+        self.rb_k = QRadioButton("Capacidade Finita (K)")
+        self.rb_n = QRadioButton("População Finita (N)")
+        self.rb_k.setChecked(True)
+        self.rg_type.addButton(self.rb_k, 0)
+        self.rg_type.addButton(self.rb_n, 1)
+        type_row.addWidget(self.rb_k)
+        type_row.addSpacing(12)
+        type_row.addWidget(self.rb_n)
+        type_row.addStretch()
+        grp_lay.addLayout(type_row)
+
+        grp_lay.addWidget(divider())
+
+        row1 = QHBoxLayout()
+        self.lam   = FieldEntry("Taxa de Chegada (λ)", "1.0", "clientes/h")
+        self.mi    = FieldEntry("Taxa de Atendimento (μ)", "2.0", "clientes/h")
+        row1.addWidget(self.lam)
+        row1.addSpacing(16)
+        row1.addWidget(self.mi)
+        grp_lay.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        self.s     = FieldEntry("Servidores (s)", "1")
+        self.limit = FieldEntry("Limite (K ou N)", "10")
+        row2.addWidget(self.s)
+        row2.addSpacing(16)
+        row2.addWidget(self.limit)
+        grp_lay.addLayout(row2)
+
+        btn = QPushButton("▶   CALCULAR")
+        btn.setObjectName("success")
+        btn.clicked.connect(self._calc)
+        grp_lay.addWidget(btn, alignment=Qt.AlignLeft)
+
+        form_lay.addWidget(grp)
+
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _calc(self):
+        lam   = self.lam.get_float()
+        mi    = self.mi.get_float()
+        s     = self.s.get_int()
+        limit = self.limit.get_int()
+
+        if not (lam and mi and s and limit):
+            QMessageBox.warning(self, "Campos inválidos", "Preencha todos os campos.")
+            return
+        if not MODELS_AVAILABLE:
+            self.output.write("✗ Módulos não disponíveis.\n"); return
+
+        self.output.clear()
+        tipo_str = "CAPACIDADE FINITA K" if self.rg_type.checkedId() == 0 else "POPULAÇÃO FINITA N"
+        self.output.write(_header(tipo_str))
+
+        try:
+            if self.rg_type.checkedId() == 0:
+                modelo = Mm1k(lam=lam, mi=mi, k=limit) if s == 1 else Mmsk(lam=lam, mi=mi, s=s, k=limit)
+            else:
+                modelo = Mm1n(lam_por_cliente=lam, mi=mi, n_pop=limit) if s == 1 \
+                    else Mmsn(lam_por_cliente=lam, mi=mi, s=s, n_pop=limit)
+
+            result = _capture(modelo.resultado)
+            self.output.write(result + "\n")
+        except Exception as e:
+            self.output.write(f"\n✗ Erro: {e}\n")
+
+
+# ── OCR Solver ────────────────────────────────────────────────────────────────
+
+class OCRTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_file = None
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
+
+        grp = QGroupBox("CARREGAR EXERCÍCIO  ·  OCR SOLVER")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(14)
+
+        self.preview = QLabel("Nenhum arquivo carregado.\nAceita: PNG · JPG · BMP · PDF")
+        self.preview.setAlignment(Qt.AlignCenter)
+        self.preview.setFixedHeight(130)
+        self.preview.setStyleSheet(
+            f"background: {C['bg']}; border: 1px dashed {C['border2']}; border-radius: 8px;"
+            f"color: {C['text3']}; font-size: 12px;"
+        )
+        grp_lay.addWidget(self.preview)
+
+        btn_row = QHBoxLayout()
+        b_img = QPushButton("🖼   Imagem")
+        b_img.setObjectName("primary")
+        b_img.clicked.connect(self._load_image)
+
+        b_pdf = QPushButton("📄   PDF")
+        b_pdf.setObjectName("primary")
+        b_pdf.clicked.connect(self._load_pdf)
+
+        b_run = QPushButton("🔍   Processar e Resolver")
+        b_run.setObjectName("success")
+        b_run.clicked.connect(self._process)
+
+        btn_row.addWidget(b_img)
+        btn_row.addSpacing(8)
+        btn_row.addWidget(b_pdf)
+        btn_row.addSpacing(16)
+        btn_row.addWidget(b_run)
+        btn_row.addStretch()
+        grp_lay.addLayout(btn_row)
+
+        form_lay.addWidget(grp)
+
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _load_image(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Selecione imagem", "",
+            "Imagens (*.png *.jpg *.jpeg *.bmp);;Todos (*)"
+        )
+        if path:
+            self.current_file = path
+            self.preview.setText(f"✓  {os.path.basename(path)}")
+            self.preview.setStyleSheet(
+                f"background: {C['bg']}; border: 1px solid {C['green']}; border-radius: 8px;"
+                f"color: {C['green']}; font-size: 12px;"
+            )
+
+    def _load_pdf(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Selecione PDF", "", "PDF (*.pdf);;Todos (*)")
+        if path:
+            self.current_file = path
+            self.preview.setText(f"✓  {os.path.basename(path)}")
+            self.preview.setStyleSheet(
+                f"background: {C['bg']}; border: 1px solid {C['green']}; border-radius: 8px;"
+                f"color: {C['green']}; font-size: 12px;"
+            )
+
+    def _process(self):
+        if not self.current_file:
+            QMessageBox.warning(self, "Aviso", "Carregue um arquivo primeiro.")
+            return
+
+        self.output.clear()
+        self.output.write(_header("OCR  ·  RESOLUÇÃO AUTOMÁTICA"))
+        ext = os.path.splitext(self.current_file)[1].lower()
+        self.output.write("  Extraindo texto...\n\n")
+
+        if ext in ('.png', '.jpg', '.jpeg', '.bmp'):
+            text = self._ocr_image(self.current_file)
+        elif ext == '.pdf':
+            text = self._read_pdf(self.current_file)
         else:
-            output.append("\n⚠️  NÃO FOI POSSÍVEL IDENTIFICAR OS PARÂMETROS")
-            output.append("\n   Parâmetros necessários: λ (taxa de chegada) e μ (taxa de atendimento)")
-            output.append("\n📝 TEXTO EXTRAÍDO DO ARQUIVO:")
-            output.append("─" * 50)
-            preview = original_text[:800] if len(original_text) > 800 else original_text
-            output.append(preview)
-            if len(original_text) > 800:
-                output.append(f"\n... (mais {len(original_text)-800} caracteres)")
-            
-            output.append("\n\n💡 DICAS:")
-            output.append("   • Certifique-se que a imagem está legível")
-            output.append("   • Use números no formato: λ = 2.5, μ = 3.0")
-            output.append("   • Para servidores: s = 2")
-        
-        return "\n".join(output)
+            text = "✗ Formato não suportado."
 
+        self.output.write(text + "\n\n")
 
-class FilaApp:
-    """Aplicação principal."""
-    
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Calculadora - Teoria das Filas")
-        self.root.geometry("1280x900")
-        self.root.minsize(1100, 800)
-        self.root.configure(bg=ModernStyle.COLORS['background'])
-        
-        # Inicializar solver
-        self.solver = ExerciseSolver()
-        
-        # Aplicar estilo
-        ModernStyle.apply_theme()
-        
-        # Criar interface
-        self._create_header()
-        self._create_notebook()
-        self._create_footer()
-    
-    def _create_header(self):
-        """Cabeçalho da aplicação."""
-        header = tk.Frame(self.root, bg=ModernStyle.COLORS['primary'], height=80)
-        header.pack(fill='x')
-        header.pack_propagate(False)
-        
-        # Logo e título
-        title_frame = tk.Frame(header, bg=ModernStyle.COLORS['primary'])
-        title_frame.pack(side='left', padx=30, pady=15)
-        
-        title = tk.Label(title_frame, text="📊 Calculadora - Teoria das Filas", 
-                        font=('Segoe UI', 22, 'bold'),
-                        bg=ModernStyle.COLORS['primary'], fg='white')
-        title.pack()
-        
-        subtitle = tk.Label(title_frame, text="Sistema de Análise de Filas | M/M/s | M/G/1 | Prioridades",
-                           font=('Segoe UI', 9),
-                           bg=ModernStyle.COLORS['primary'], fg='#b2bec3')
-        subtitle.pack()
-        
-        # Versão
-        version = tk.Label(header, text="v2.0",
-                          font=('Segoe UI', 10),
-                          bg=ModernStyle.COLORS['primary'], fg='#b2bec3')
-        version.pack(side='right', padx=20)
-    
-    def _create_footer(self):
-        """Rodapé da aplicação."""
-        footer = tk.Frame(self.root, bg=ModernStyle.COLORS['surface'], height=30)
-        footer.pack(side='bottom', fill='x')
-        footer.pack_propagate(False)
-        
-        status = tk.Label(footer, text="✅ Pronto | OCR com Tesseract | Suporte a Imagens e PDFs",
-                         font=('Segoe UI', 8),
-                         bg=ModernStyle.COLORS['surface'], fg=ModernStyle.COLORS['text_light'])
-        status.pack(pady=5)
-    
-    def _create_notebook(self):
-        """Cria o notebook com as abas."""
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(expand=True, fill='both', padx=15, pady=(10, 15))
-        
-        # Criar abas
-        self._create_tab_mms()
-        self._create_tab_mg1()
-        self._create_tab_priority()
-        self._create_tab_finite()
-        self._create_tab_ocr()
-        self._create_tab_exercises()
-    
-    def _create_card(self, parent, title):
-        """Cria um card estilizado."""
-        card = ttk.LabelFrame(parent, text=title, padding=15, style='Card.TLabelframe')
-        return card
-    
-    def _create_tab_mms(self):
-        """Aba M/M/s."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="📈 M/M/s")
-        
-        # Layout principal
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        # Card de entrada
-        input_card = self._create_card(main_frame, "Parâmetros do Sistema")
-        input_card.pack(fill='x', padx=20, pady=15)
-        
-        # Grid de campos
-        fields_frame = ttk.Frame(input_card)
-        fields_frame.pack(fill='x')
-        
-        self.mms_lam = ModernEntry(fields_frame, "Taxa de Chegada (λ)", "1.0", "clientes/h", 
-                                   "Taxa média de chegada de clientes")
-        self.mms_lam.grid(row=0, column=0, padx=10, pady=5, sticky='ew')
-        
-        self.mms_mi = ModernEntry(fields_frame, "Taxa de Atendimento (μ)", "2.0", "clientes/h",
-                                  "Taxa média de atendimento por servidor")
-        self.mms_mi.grid(row=0, column=1, padx=10, pady=5, sticky='ew')
-        
-        self.mms_s = ModernEntry(fields_frame, "Servidores (s)", "1", "",
-                                 "Número de servidores no sistema")
-        self.mms_s.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
-        
-        self.mms_t = ModernEntry(fields_frame, "Tempo t (min)", "60", "min",
-                                 "Para calcular P(W>t) e P(Wq>t)")
-        self.mms_t.grid(row=1, column=1, padx=10, pady=5, sticky='ew')
-        
-        self.mms_n = ModernEntry(fields_frame, "Clientes (n)", "5", "",
-                                 "Para calcular probabilidade P(n)")
-        self.mms_n.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
-        
-        fields_frame.columnconfigure(0, weight=1)
-        fields_frame.columnconfigure(1, weight=1)
-        
-        # Botão calcular
-        btn_frame = ttk.Frame(input_card)
-        btn_frame.pack(pady=15)
-        
-        self.mms_output = OutputArea(main_frame, "RESULTADOS M/M/s")
-        
-        def calcular():
-            lam = self.mms_lam.get_float()
-            mi = self.mms_mi.get_float()
-            s = self.mms_s.get_int()
-            t = self.mms_t.get_float()
-            n = self.mms_n.get_int()
-            
-            if not lam or not mi or not s:
-                messagebox.showerror("Erro", "Preencha λ, μ e s corretamente")
-                return
-            
+        if not text.startswith("✗"):
+            self.output.write("─" * 68 + "\n")
+            self.output.write("  Analisando parâmetros e resolvendo...\n\n")
+            params = self._parse(text)
+            self.output.write(self._solve(params, text) + "\n")
+
+    def _ocr_image(self, path):
+        if not (PILLOW_AVAILABLE and TESSERACT_AVAILABLE):
+            return "✗ OCR não disponível. Instale: pip install pytesseract pillow"
+        try:
+            img = Image.open(path).convert("L")
+            return pytesseract.image_to_string(img, lang="por+eng")
+        except Exception as e:
+            return f"✗ Erro OCR: {e}"
+
+    def _read_pdf(self, path):
+        if not PDF_AVAILABLE:
+            return "✗ PyMuPDF não disponível. Instale: pip install PyMuPDF"
+        try:
+            doc = fitz.open(path)
+            out = ""
+            for i, pg in enumerate(doc, 1):
+                t = pg.get_text()
+                if t.strip():
+                    out += f"[p.{i}]\n{t}\n"
+            return out or "✗ Nenhum texto extraído do PDF."
+        except Exception as e:
+            return f"✗ Erro PDF: {e}"
+
+    def _parse(self, text):
+        t = text.lower()
+        params = {"lam": None, "mi": None, "s": 1, "k": None, "n": None}
+        patterns = {
+            "lam": [r"λ\s*=\s*([\d,\.]+)", r"lambda\s*=\s*([\d,\.]+)", r"taxa de chegada\s*[:=]\s*([\d,\.]+)"],
+            "mi":  [r"μ\s*=\s*([\d,\.]+)", r"mi\s*=\s*([\d,\.]+)", r"taxa de atendimento\s*[:=]\s*([\d,\.]+)"],
+            "s":   [r"servidores?\s*[:=]\s*(\d+)", r"\bs\s*=\s*(\d+)", r"canais?\s*[:=]\s*(\d+)"],
+            "k":   [r"capacidade\s*[:=]\s*(\d+)", r"\bk\s*=\s*(\d+)"],
+            "n":   [r"popula[cç][aã]o\s*[:=]\s*(\d+)", r"\bn\s*=\s*(\d+)"],
+        }
+        for key, pats in patterns.items():
+            for pat in pats:
+                m = re.search(pat, t)
+                if m:
+                    v = m.group(1).replace(",", ".")
+                    params[key] = int(float(v)) if key in ("s", "k", "n") else float(v)
+                    break
+        return params
+
+    def _solve(self, p, original):
+        lines = []
+        if p["lam"] and p["mi"]:
+            lam, mi, s = p["lam"], p["mi"], p["s"]
+            rho = lam / (s * mi)
+            lines.append(f"  λ = {lam},  μ = {mi},  s = {s}")
+            lines.append(f"  ρ = {rho:.4f}  ({rho*100:.2f}%)\n")
+            if rho >= 1:
+                lines.append("  ⚠  Sistema instável (ρ ≥ 1)")
+                return "\n".join(lines)
             if not MODELS_AVAILABLE:
-                self.mms_output.write("❌ Módulos de modelo não disponíveis.\n")
-                return
-            
+                lines.append("  ✗ Modelos não disponíveis para cálculo completo.")
+                return "\n".join(lines)
             try:
                 modelo = Mm(lam=lam, mi=mi, s=s)
-                
-                old_stdout = sys.stdout
-                sys.stdout = io.StringIO()
-                modelo.resultado()
-                result = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-                
-                self.mms_output.write("═" * 70 + "\n")
-                self.mms_output.write("📊 RESULTADOS DO SISTEMA\n")
-                self.mms_output.write("═" * 70 + "\n\n")
-                self.mms_output.write(result + "\n")
-                
-                if n:
-                    prob_n = modelo.prob_n_clientes(n=n)
-                    self.mms_output.write(f"📌 P({n}) = {prob_n:.6f} ({prob_n*100:.4f}%)\n")
-                
-                if t:
-                    t_horas = t / 60.0
-                    prob_wq = modelo.prob_wq_maior_que_t(t=t_horas)
-                    self.mms_output.write(f"📌 P(Wq > {t:.2f} min) = {prob_wq:.6f} ({prob_wq*100:.4f}%)\n")
-                    
-                    if s == 1:
-                        prob_w = modelo.prob_w_maior_que_t(t=t_horas)
-                        self.mms_output.write(f"📌 P(W > {t:.2f} min) = {prob_w:.6f} ({prob_w*100:.4f}%)\n")
+                res = _capture(modelo.resultado)
+                lines.append(res)
             except Exception as e:
-                self.mms_output.write(f"❌ Erro: {str(e)}\n")
-        
-        calc_btn = ttk.Button(btn_frame, text="▶ CALCULAR", command=calcular, style='Success.TButton')
-        calc_btn.pack(ipadx=30, ipady=5)
-    
-    def _create_tab_mg1(self):
-        """Aba M/G/1."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="📐 M/G/1")
-        
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        input_card = self._create_card(main_frame, "Parâmetros M/G/1")
-        input_card.pack(fill='x', padx=20, pady=15)
-        
-        fields_frame = ttk.Frame(input_card)
-        fields_frame.pack(fill='x')
-        
-        self.mg1_lam = ModernEntry(fields_frame, "Taxa de Chegada (λ)", "8.0", "clientes/h",
-                                   "Taxa média de chegada de clientes")
-        self.mg1_lam.grid(row=0, column=0, padx=10, pady=5, sticky='ew')
-        
-        self.mg1_mi = ModernEntry(fields_frame, "Taxa de Atendimento (μ)", "10.0", "clientes/h",
-                                  "Taxa média de atendimento")
-        self.mg1_mi.grid(row=0, column=1, padx=10, pady=5, sticky='ew')
-        
-        self.mg1_var = ModernEntry(fields_frame, "Variância (σ²)", "0.005", "",
-                                   "Variância do tempo de serviço")
-        self.mg1_var.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
-        
-        fields_frame.columnconfigure(0, weight=1)
-        fields_frame.columnconfigure(1, weight=1)
-        
-        btn_frame = ttk.Frame(input_card)
-        btn_frame.pack(pady=15)
-        
-        self.mg1_output = OutputArea(main_frame, "RESULTADOS M/G/1")
-        
-        def calcular():
-            lam = self.mg1_lam.get_float()
-            mi = self.mg1_mi.get_float()
-            var = self.mg1_var.get_float()
-            
-            if not lam or not mi or var is None:
-                messagebox.showerror("Erro", "Preencha todos os campos corretamente")
-                return
-            
-            if not MODELS_AVAILABLE:
-                self.mg1_output.write("❌ Módulos de modelo não disponíveis.\n")
-                return
-            
-            try:
-                modelo = Mg1(lam=lam, mi=mi, var=var)
-                
-                old_stdout = sys.stdout
-                sys.stdout = io.StringIO()
-                modelo.mg1_print()
-                result = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-                
-                self.mg1_output.write("═" * 70 + "\n")
-                self.mg1_output.write("📊 RESULTADOS M/G/1\n")
-                self.mg1_output.write("═" * 70 + "\n\n")
-                self.mg1_output.write(result + "\n")
-            except Exception as e:
-                self.mg1_output.write(f"❌ Erro: {str(e)}\n")
-        
-        calc_btn = ttk.Button(btn_frame, text="▶ CALCULAR", command=calcular, style='Success.TButton')
-        calc_btn.pack(ipadx=30, ipady=5)
-    
-    def _create_tab_priority(self):
-        """Aba de prioridades."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="⚡ Prioridades")
-        
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        input_card = self._create_card(main_frame, "Parâmetros de Prioridade")
-        input_card.pack(fill='x', padx=20, pady=15)
-        
-        # Taxas de chegada
-        ttk.Label(input_card, text="Taxas de Chegada (λi):  (separados por vírgula, ex: 1.5, 2.0, 0.5)",
-                 font=('Segoe UI', 10)).pack(anchor='w')
-        self.pri_lambdas = tk.Entry(input_card, font=('Segoe UI', 10))
-        self.pri_lambdas.insert(0, "1.5, 2.0, 0.5")
-        self.pri_lambdas.pack(fill='x', pady=(3, 8), ipady=4)
+                lines.append(f"  ✗ Erro: {e}")
+        else:
+            lines.append("  ✗ Parâmetros insuficientes (precisa de λ e μ).\n")
+            lines.append("  Texto extraído (prévia):\n  " + original[:600].replace("\n", "\n  "))
+        return "\n".join(lines)
 
-        # Outros campos
-        fields_frame = ttk.Frame(input_card)
-        fields_frame.pack(fill='x', pady=5)
 
-        self.pri_mi = ModernEntry(fields_frame, "Taxa de Atendimento (μ)", "4.0", "clientes/h")
-        self.pri_mi.pack(side='left', expand=True, fill='x', padx=5)
+# ── Lista de Exercícios ───────────────────────────────────────────────────────
 
-        self.pri_s = ModernEntry(fields_frame, "Servidores (s)", "2", "")
-        self.pri_s.pack(side='left', expand=True, fill='x', padx=5)
+class ExercisesTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # Tipo de prioridade (lado a lado, sem labelframe extra)
-        type_frame = ttk.Frame(input_card)
-        type_frame.pack(fill='x', pady=(8, 0))
+        form = QWidget()
+        form_lay = QVBoxLayout(form)
+        form_lay.setContentsMargins(0, 0, 0, 0)
+        form_lay.setSpacing(20)
 
-        ttk.Label(type_frame, text="Tipo:", font=('Segoe UI', 10, 'bold')).pack(side='left', padx=(0, 10))
-        self.pri_type = tk.StringVar(value="nonpreemptive")
-        ttk.Radiobutton(type_frame, text="Sem Interrupção",
-                       variable=self.pri_type, value="nonpreemptive").pack(side='left', padx=8)
-        ttk.Radiobutton(type_frame, text="Com Interrupção",
-                       variable=self.pri_type, value="preemptive").pack(side='left', padx=8)
+        grp = QGroupBox("LISTA DE EXERCÍCIOS")
+        grp_lay = QVBoxLayout(grp)
+        grp_lay.setSpacing(16)
 
-        btn_frame = ttk.Frame(input_card)
-        btn_frame.pack(pady=8)
-        
-        self.pri_output = OutputArea(main_frame, "RESULTADOS PRIORIDADES")
-        
-        def calcular():
-            lambdas_text = self.pri_lambdas.get()
-            lambdas = []
-            for x in lambdas_text.split(','):
-                try:
-                    lambdas.append(float(x.strip().replace(',', '.')))
-                except:
-                    pass
-            
-            mi = self.pri_mi.get_float()
-            s = self.pri_s.get_int()
-            
-            if not lambdas or not mi or not s:
-                messagebox.showerror("Erro", "Preencha todos os campos corretamente")
-                return
-            
-            if not MODELS_AVAILABLE:
-                self.pri_output.write("❌ Módulos de modelo não disponíveis.\n")
-                return
-            
-            try:
-                if self.pri_type.get() == "nonpreemptive":
-                    resultado = mms_prioridade_sem_interrupcao(lambdas_=lambdas, mi=mi, servidores=s)
-                else:
-                    resultado = mms_prioridade_com_interrupcao(lambdas_=lambdas, mi=mi, servidores=s)
-                
-                self.pri_output.write("═" * 70 + "\n")
-                self.pri_output.write("📊 RESULTADOS\n")
-                self.pri_output.write("═" * 70 + "\n\n")
-                
-                for classe, vals in resultado.items():
-                    if classe == "Erro":
-                        self.pri_output.write(f"❌ {vals}\n")
-                        return
-                    self.pri_output.write(f"📦 {classe}\n")
-                    self.pri_output.write("─" * 40 + "\n")
-                    for key, value in vals.items():
-                        if isinstance(value, float):
-                            self.pri_output.write(f"   {key}: {value:.6f}\n")
-                        else:
-                            self.pri_output.write(f"   {key}: {value}\n")
-                    self.pri_output.write("\n")
-            except Exception as e:
-                self.pri_output.write(f"❌ Erro: {str(e)}\n")
-        
-        calc_btn = ttk.Button(btn_frame, text="▶ CALCULAR", command=calcular, style='Success.TButton')
-        calc_btn.pack(ipadx=30, ipady=5)
-    
-    def _create_tab_finite(self):
-        """Aba de filas finitas."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="🔒 Filas Finitas")
-        
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        input_card = self._create_card(main_frame, "Parâmetros")
-        input_card.pack(fill='x', padx=20, pady=15)
-        
-        # Tipo de fila
-        type_frame = ttk.Frame(input_card)
-        type_frame.pack(fill='x', pady=5)
-        
-        self.fin_type = tk.StringVar(value="k")
-        ttk.Radiobutton(type_frame, text="Capacidade Finita (K)", 
-                       variable=self.fin_type, value="k").pack(side='left', padx=10)
-        ttk.Radiobutton(type_frame, text="População Finita (N)", 
-                       variable=self.fin_type, value="n").pack(side='left', padx=10)
-        
-        ttk.Separator(input_card, orient='horizontal').pack(fill='x', pady=10)
-        
-        # Campos
-        fields_frame = ttk.Frame(input_card)
-        fields_frame.pack(fill='x')
-        
-        self.fin_lam = ModernEntry(fields_frame, "Taxa de Chegada (λ)", "1.0", "clientes/h")
-        self.fin_lam.grid(row=0, column=0, padx=10, pady=5, sticky='ew')
-        
-        self.fin_mi = ModernEntry(fields_frame, "Taxa de Atendimento (μ)", "2.0", "clientes/h")
-        self.fin_mi.grid(row=0, column=1, padx=10, pady=5, sticky='ew')
-        
-        self.fin_s = ModernEntry(fields_frame, "Servidores (s)", "1", "")
-        self.fin_s.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
-        
-        self.fin_limit = ModernEntry(fields_frame, "Limite (K ou N)", "10", "")
-        self.fin_limit.grid(row=1, column=1, padx=10, pady=5, sticky='ew')
-        
-        fields_frame.columnconfigure(0, weight=1)
-        fields_frame.columnconfigure(1, weight=1)
-        
-        btn_frame = ttk.Frame(input_card)
-        btn_frame.pack(pady=15)
-        
-        self.fin_output = OutputArea(main_frame, "RESULTADOS FILAS FINITAS")
-        
-        def calcular():
-            lam = self.fin_lam.get_float()
-            mi = self.fin_mi.get_float()
-            s = self.fin_s.get_int()
-            limit = self.fin_limit.get_int()
-            
-            if not lam or not mi or not s or not limit:
-                messagebox.showerror("Erro", "Preencha todos os campos corretamente")
-                return
-            
-            if not MODELS_AVAILABLE:
-                self.fin_output.write("❌ Módulos de modelo não disponíveis.\n")
-                return
-            
-            try:
-                if self.fin_type.get() == "k":
-                    if s == 1:
-                        modelo = Mm1k(lam=lam, mi=mi, k=limit)
-                    else:
-                        modelo = Mmsk(lam=lam, mi=mi, s=s, k=limit)
-                else:
-                    if s == 1:
-                        modelo = Mm1n(lam_por_cliente=lam, mi=mi, n_pop=limit)
-                    else:
-                        modelo = Mmsn(lam_por_cliente=lam, mi=mi, s=s, n_pop=limit)
-                
-                old_stdout = sys.stdout
-                sys.stdout = io.StringIO()
-                modelo.resultado()
-                result = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-                
-                self.fin_output.write("═" * 70 + "\n")
-                tipo = "Capacidade K" if self.fin_type.get() == "k" else "População N"
-                self.fin_output.write(f"📊 RESULTADOS - {tipo}\n")
-                self.fin_output.write("═" * 70 + "\n\n")
-                self.fin_output.write(result + "\n")
-            except Exception as e:
-                self.fin_output.write(f"❌ Erro: {str(e)}\n")
-        
-        calc_btn = ttk.Button(btn_frame, text="▶ CALCULAR", command=calcular, style='Success.TButton')
-        calc_btn.pack(ipadx=30, ipady=5)
-    
-    def _create_tab_ocr(self):
-        """Aba OCR para resolver exercícios de imagem/PDF."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="🔍 OCR Solver")
-        
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        # Card de upload
-        upload_card = self._create_card(main_frame, "Upload do Exercício")
-        upload_card.pack(fill='x', padx=20, pady=15)
-        
-        # Área de preview
-        preview_frame = ttk.LabelFrame(upload_card, text="Preview", padding=10)
-        preview_frame.pack(fill='x', pady=10)
-        
-        self.preview_label = tk.Label(preview_frame, text="🖼️ Nenhum arquivo carregado",
-                                     bg=ModernStyle.COLORS['background'],
-                                     height=8, relief='solid', borderwidth=1,
-                                     font=('Segoe UI', 10))
-        self.preview_label.pack(fill='x')
-        
-        self.current_file = None
-        
-        def upload_image():
-            file_path = filedialog.askopenfilename(
-                title="Selecione uma imagem",
-                filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp"), ("Todos", "*.*")]
-            )
-            if file_path:
-                self.current_file = file_path
-                try:
-                    img = Image.open(file_path)
-                    # Redimensionar para preview
-                    img.thumbnail((500, 200))
-                    photo = ImageTk.PhotoImage(img)
-                    self.preview_label.configure(image=photo, text="")
-                    self.preview_label.image = photo
-                except Exception as e:
-                    self.preview_label.configure(text=f"📁 {os.path.basename(file_path)}", image='')
-        
-        def upload_pdf():
-            file_path = filedialog.askopenfilename(
-                title="Selecione um PDF",
-                filetypes=[("PDF", "*.pdf"), ("Todos", "*.*")]
-            )
-            if file_path:
-                self.current_file = file_path
-                self.preview_label.configure(text=f"📄 PDF: {os.path.basename(file_path)}\n\nClique em 'Processar' para extrair o texto", image='')
-        
-        def process_and_solve():
-            if not self.current_file:
-                messagebox.showwarning("Aviso", "Carregue uma imagem ou PDF primeiro!")
-                return
-            
-            self.ocr_output.clear()
-            self.ocr_output.write("═" * 70 + "\n")
-            self.ocr_output.write("🔄 PROCESSANDO ARQUIVO...\n")
-            self.ocr_output.write("═" * 70 + "\n\n")
-            
-            # Extrair texto
-            ext = os.path.splitext(self.current_file)[1].lower()
-            
-            self.ocr_output.write("📝 EXTRAINDO TEXTO...\n")
-            self.ocr_output.write("─" * 40 + "\n")
-            
-            if ext in ['.png', '.jpg', '.jpeg', '.bmp']:
-                text = self.solver.extract_text_from_image(self.current_file)
-            elif ext == '.pdf':
-                text = self.solver.extract_text_from_pdf(self.current_file)
-            else:
-                text = "❌ Formato de arquivo não suportado. Use imagem (PNG, JPG) ou PDF."
-            
-            self.ocr_output.write(text + "\n\n")
-            
-            # Se extraiu texto, tentar resolver
-            if not text.startswith("❌"):
-                self.ocr_output.write("🔍 ANALISANDO EXERCÍCIO...\n")
-                self.ocr_output.write("─" * 40 + "\n")
-                
-                params = self.solver.parse_exercise(text)
-                result = self.solver.solve(params, text)
-                self.ocr_output.write(result + "\n")
-            else:
-                self.ocr_output.write("\n" + text + "\n")
-        
-        # Botões
-        btn_frame = ttk.Frame(upload_card)
-        btn_frame.pack(pady=15)
-        
-        ttk.Button(btn_frame, text="📷 Carregar Imagem", command=upload_image,
-                  style='Primary.TButton').pack(side='left', padx=5, ipadx=10)
-        ttk.Button(btn_frame, text="📄 Carregar PDF", command=upload_pdf,
-                  style='Primary.TButton').pack(side='left', padx=5, ipadx=10)
-        ttk.Button(btn_frame, text="🔍 Processar e Resolver", command=process_and_solve,
-                  style='Success.TButton').pack(side='left', padx=5, ipadx=10)
-        
-        # Área de resultados
-        self.ocr_output = OutputArea(main_frame, "RESULTADOS OCR")
-    
-    def _create_tab_exercises(self):
-        """Aba lista de exercícios."""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="📝 Lista")
-        
-        main_frame = ttk.Frame(tab)
-        main_frame.pack(fill='both', expand=True)
-        
-        # Card de informações
-        info_card = self._create_card(main_frame, "Informações")
-        info_card.pack(fill='x', padx=20, pady=15)
-        
-        info_text = """🎓 LISTA DE EXERCÍCIOS - TEORIA DAS FILAS
+        info = QLabel(
+            "Executa todos os testes definidos em  ListaExercicios.py.\n\n"
+            "Certifique-se de que o arquivo está na mesma pasta do programa."
+        )
+        info.setStyleSheet(f"color: {C['text2']}; font-size: 12px;")
+        info.setWordWrap(True)
+        grp_lay.addWidget(info)
 
-Esta função executa todos os testes definidos no arquivo 'ListaExercicios.py'.
-Os resultados serão exibidos abaixo.
+        btn = QPushButton("▶   RODAR TODOS OS EXERCÍCIOS")
+        btn.setObjectName("success")
+        btn.clicked.connect(self._run)
+        grp_lay.addWidget(btn, alignment=Qt.AlignLeft)
 
-⚠️ Certifique-se de que o arquivo 'ListaExercicios.py' está na mesma pasta do programa."""
-        
-        info_label = tk.Label(info_card, text=info_text, justify='left',
-                             font=('Segoe UI', 10), 
-                             bg=ModernStyle.COLORS['surface'],
-                             fg=ModernStyle.COLORS['text'])
-        info_label.pack(pady=10)
-        
-        self.exercises_output = OutputArea(main_frame, "RESULTADOS LISTA")
-        
-        def run():
-            if not MODELS_AVAILABLE:
-                self.exercises_output.write("❌ Módulos de modelo não disponíveis.\n")
-                return
-            
-            try:
-                self.exercises_output.write("═" * 70 + "\n")
-                self.exercises_output.write("🚀 EXECUTANDO LISTA DE EXERCÍCIOS\n")
-                self.exercises_output.write("═" * 70 + "\n\n")
-                
-                old_stdout = sys.stdout
-                sys.stdout = TextRedirector(self.exercises_output.text_area)
-                rodar_testes()
-                sys.stdout = old_stdout
-            except Exception as e:
-                self.exercises_output.write(f"❌ Erro ao executar lista: {str(e)}\n")
-        
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(pady=10)
-        
-        run_btn = ttk.Button(btn_frame, text="🚀 RODAR TODOS OS EXERCÍCIOS", 
-                            command=run, style='Success.TButton')
-        run_btn.pack(ipadx=40, ipady=8)
+        form_lay.addWidget(grp)
+
+        self.output = OutputArea()
+        sp = _make_splitter(_left_panel(form), _right_panel(self.output))
+        root.addWidget(sp)
+
+    def _run(self):
+        if not MODELS_AVAILABLE:
+            self.output.write("✗ Módulos não disponíveis.\n"); return
+
+        self.output.clear()
+        self.output.write(_header("LISTA DE EXERCÍCIOS"))
+
+        class _Redirect:
+            def __init__(self, out): self.out = out
+            def write(self, t): self.out.write(t)
+            def flush(self): pass
+
+        old = sys.stdout
+        sys.stdout = _Redirect(self.output)
+        try:
+            rodar_testes()
+        except Exception as e:
+            self.output.write(f"\n✗ Erro: {e}\n")
+        finally:
+            sys.stdout = old
+
+
+# ─── Janela Principal ─────────────────────────────────────────────────────────
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Teoria das Filas")
+        self.resize(1360, 940)
+        self.setMinimumSize(1100, 780)
+        self.setStyleSheet(STYLE)
+
+        root = QWidget()
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        layout.addWidget(Header())
+
+        # Notebook
+        tabs = QTabWidget()
+        tabs.setDocumentMode(True)
+
+        tabs.addTab(MmsTab(),       "M/M/s")
+        tabs.addTab(Mg1Tab(),       "M/G/1")
+        tabs.addTab(PriorityTab(),  "Prioridades")
+        tabs.addTab(FiniteTab(),    "Filas Finitas")
+        tabs.addTab(OCRTab(),       "OCR Solver")
+        tabs.addTab(ExercisesTab(), "Lista")
+
+        wrap = QWidget()
+        wrap.setStyleSheet(f"background: {C['bg']};")
+        wl = QVBoxLayout(wrap)
+        wl.setContentsMargins(16, 12, 16, 12)
+        wl.addWidget(tabs)
+
+        layout.addWidget(wrap, 1)
+        layout.addWidget(Footer())
+
+
+# ─── Entrypoint ──────────────────────────────────────────────────────────────
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Teoria das Filas")
+
+    # Centralizar
+    win = MainWindow()
+    screen = app.primaryScreen().geometry()
+    x = (screen.width()  - win.width())  // 2
+    y = (screen.height() - win.height()) // 2
+    win.move(x, y)
+    win.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    
-    # Centralizar janela
-    root.update_idletasks()
-    width = 1280
-    height = 900
-    x = (root.winfo_screenwidth() // 2) - (width // 2)
-    y = (root.winfo_screenheight() // 2) - (height // 2)
-    root.geometry(f'{width}x{height}+{x}+{y}')
-    
-    app = FilaApp(root)
-    root.mainloop()
+    main()
